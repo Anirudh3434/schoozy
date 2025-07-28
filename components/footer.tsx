@@ -92,23 +92,23 @@ export function Footer() {
               <div className="flex items-start">
                 <Mail className="w-5 h-5 text-blue-400 mt-1 mr-3 flex-shrink-0" />
                 <div>
-                  <p className="text-gray-300">info@schoozyed.com</p>
-                  <p className="text-gray-300">support@schoozyed.com</p>
+                  <p className="text-gray-300">Hello@Schoozy.in</p>
+   
                 </div>
               </div>
               <div className="flex items-start">
                 <Phone className="w-5 h-5 text-blue-400 mt-1 mr-3 flex-shrink-0" />
                 <div>
-                  <p className="text-gray-300">+91 98765 43210</p>
-                  <p className="text-gray-300">+91 87654 32109</p>
+                  <p className="text-gray-300">+91-9817939901</p>
+    
                 </div>
               </div>
               <div className="flex items-start">
                 <MapPin className="w-5 h-5 text-blue-400 mt-1 mr-3 flex-shrink-0" />
                 <p className="text-gray-300">
-                  123 Education Street,
-                  <br />
-                  Knowledge City, State 560001
+                   Schoozy Edutech Pvt Ltd, Plot No.
+                    378, Industrial Area, Phase 8B, Sector 74,
+                    Mohali, Punjab, 160074.
                 </p>
               </div>
             </div>
