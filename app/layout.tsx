@@ -6,7 +6,7 @@ import './globals.css'
 // app/page.tsx
 export const metadata = {
   title: "Schoozy Edutech – Scholarship Platform for Students",
-  description: "Join Schoozy Edutech's scholarship programs for classes 8–12. Empowering students and discovering talents.",
+  description: "Join Schoozy Edutech’s scholarship programs for students in grades 8–12. Discover your true potential and earn rewards through exciting challenges.",
   keywords: "Schoozy Edutech, scholarship exams, student scholarships, class 8, class 9, class 10, class 11, class 12, education platform",
   openGraph: {
     title: "Schoozy Edutech – Uplifting Futures",
