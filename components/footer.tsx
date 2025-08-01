@@ -22,25 +22,20 @@ export function Footer() {
             </p>
             <div className="flex space-x-4">
               <a
-                href="#"
+                href="https://www.facebook.com/schoozy.in/"
                 className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors duration-300"
               >
                 <Facebook className="w-5 h-5" />
               </a>
+             
               <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors duration-300"
-              >
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
+                href="https://www.instagram.com/schoozy.in?igsh=MXB3aDY3ZDNyeHB0cg=="
                 className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors duration-300"
               >
                 <Instagram className="w-5 h-5" />
               </a>
               <a
-                href="#"
+                href="https://www.linkedin.com/company/schoozy-psm/"
                 className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors duration-300"
               >
                 <Linkedin className="w-5 h-5" />
@@ -92,15 +87,13 @@ export function Footer() {
               <div className="flex items-start">
                 <Mail className="w-5 h-5 text-blue-400 mt-1 mr-3 flex-shrink-0" />
                 <div>
-                  <p className="text-gray-300">Hello@Schoozy.in</p>
-   
+                  <p className="text-gray-300">info@schoozy.in</p>
                 </div>
               </div>
               <div className="flex items-start">
                 <Phone className="w-5 h-5 text-blue-400 mt-1 mr-3 flex-shrink-0" />
                 <div>
                   <p className="text-gray-300">+91-9817939901</p>
-    
                 </div>
               </div>
               <div className="flex items-start">
@@ -119,13 +112,13 @@ export function Footer() {
         <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400 text-sm">© 2024 Schoozy Edutech Private Limited. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">
-            <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
+            <a href="https://profound-youtiao-4ab60d.netlify.app" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
               Privacy Policy
             </a>
-            <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
+            <a href="https://illustrious-alpaca-6e42db.netlify.app" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
               Terms of Service
             </a>
-            <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
+            <a href="https://illustrious-alpaca-6e42db.netlify.app" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
               Cookie Policy
             </a>
           </div>

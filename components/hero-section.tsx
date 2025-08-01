@@ -1,7 +1,12 @@
+"use client"
 import { Button } from "@/components/ui/button"
 import { GraduationCap, Trophy, Users, BookOpen } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function HeroSection() {
+
+  const router = useRouter()
+
   return (
     <section
       id="home"
@@ -46,6 +51,7 @@ export function HeroSection() {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Button
+              onClick={() => router.push("/olympia-x-register")}
               size="lg"
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
