@@ -1,11 +1,45 @@
 "use client"
 import { Button } from "@/components/ui/button"
+import axios from "axios"
 import { GraduationCap, Trophy, Users, BookOpen } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 
 export function HeroSection() {
+  
+  const [loading, setLoading] = useState<boolean>(false)
 
   const router = useRouter()
+
+ const handleRegister = async () => {
+    if (loading) return; // prevent double submit
+    setLoading(true);
+
+    try {
+      const response = await axios.get("https://schoozy.in/api/auth/verify", {
+        withCredentials: true,
+        timeout: 5000, // 5s timeout
+      });
+
+      console.log("verify response:", response.data.message);
+
+      // Optional: check some condition on response.data before navigating
+      if (response.data.message === "User is verified") {
+        router.push("/olympia-x-register");
+      } else {
+      alert("User is not verified");
+        router.push("/login-account");
+
+      }
+    } catch (err) {
+      console.error("handleRegister error:", err);
+
+      router.push("/login-account");
+   
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <section
@@ -51,7 +85,7 @@ export function HeroSection() {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
             <Button
-              onClick={() => router.push("/olympia-x-register")}
+              onClick={handleRegister}
               size="lg"
               className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
@@ -102,3 +136,4 @@ export function HeroSection() {
     </section>
   )
 }
+

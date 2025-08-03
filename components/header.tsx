@@ -25,9 +25,9 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">SE</span>
-              </div>
+              <div className="w-12 h-12 flex items-center justify-center">
+                <img src="https://registeration-docs.s3.us-east-1.amazonaws.com/WhatsApp+Image+2025-08-01+at+10.59.48.jpeg" alt="Girl in a jacket"/>
+	 	</div>
             </div>
             <div className="ml-3">
               <h1 className="text-xl font-bold text-gray-900">Schoozy Edutech</h1>

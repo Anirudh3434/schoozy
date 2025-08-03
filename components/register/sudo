@@ -294,7 +294,7 @@ const OlympiaXRegistrationForm = () => {
 
       // 2. Open Razorpay Checkout
       const options = {
-        key: "rzp_test_KCtwtEcL8qZYNZ", // Your Razorpay Key ID
+        key: "rzp_live_ngi2rcX5iuJttX", // Your Razorpay Key ID
         amount: order.amount,
         currency: order.currency,
         name: "Olympia-X Registration",

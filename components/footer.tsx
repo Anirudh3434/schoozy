@@ -121,9 +121,14 @@ export function Footer() {
             <a href="https://illustrious-alpaca-6e42db.netlify.app" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
               Cookie Policy
             </a>
+
+            <a href="https://extraordinary-melomakarona-afd5de.netlify.app" className="text-gray-400 hover:text-white text-sm transition-colors duration-200">
+              Cancellation Policy
+            </a>
           </div>
         </div>
       </div>
     </footer>
   )
 }
+
