@@ -9,7 +9,7 @@ import { Footer } from "@/components/footer"
 export default function OlympiaXPage() {
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+
       <main>
         <OlympiaHero />
         <OlympiaOverview />
@@ -17,7 +17,7 @@ export default function OlympiaXPage() {
         <ExamDetails />
         <ContactSection />
       </main>
-      <Footer />
+     
     </div>
   )
 }

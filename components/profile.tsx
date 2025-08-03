@@ -1,4 +1,3 @@
-
 "use client"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Mail, ExternalLink, Loader2, RefreshCw, User, Phone, MapPin, School, Calendar, CreditCard, FileText } from "lucide-react"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/router"
+import { useRouter } from "next/navigation"
 import axios from "axios"
 
 // Type definitions based on your API response structure

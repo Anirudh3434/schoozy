@@ -9,7 +9,7 @@ import { Footer } from "@/components/footer"
 export default function ServicesPage() {
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+
       <main>
         <ServicesHero />
         <ServiceOverview />
@@ -17,7 +17,7 @@ export default function ServicesPage() {
         <IMSSection />
         <PortfolioSection />
       </main>
-      <Footer />
+   
     </div>
   )
 }

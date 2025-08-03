@@ -9,7 +9,7 @@ import { Footer } from "@/components/footer"
 export default function IMSPage() {
   return (
     <div className="min-h-screen bg-white">
-      <Header />
+
       <main>
         <IMSHero />
         <IMSFeatures />
@@ -17,7 +17,7 @@ export default function IMSPage() {
         <IMSTestimonials />
         <IMSFAQ />
       </main>
-      <Footer />
+
     </div>
   )
 }
