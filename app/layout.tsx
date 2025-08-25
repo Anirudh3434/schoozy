@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description:
     "Join Olympia-X 2025 by Schoozy Edutech – India’s premier Olympiad Exam for Classes 8–12. Win prizes worth up to ₹1 Cr, laptops, certificates, and nationwide recognition!",
   keywords:
-    "Schoozy Edutech, scholarship exams, Olympia-X 2025, Olympia X exam, student scholarships, national olympiad 2025, olympiad for class 8, olympiad for class 9, olympiad for class 10, olympiad for class 11, olympiad for class 12, Olympia-X subjects, Physics Olympiad 2025, Chemistry Olympiad 2025, Math Olympiad 2025, Biology Olympiad 2025, science olympiad India, maths olympiad India, student competitions India, online olympiad exam, academic scholarships, education platform India, school scholarship exams 2025, competitive exams for students, talent exams India, OLP program, scholarship program 2025",
+    "Schoozy Edutech, scholarship exams, Olympia-X 2025, Olympia X exam, student scholarships, national olympiad 2025, olympiad for class 8, olympiad for class 9, olympiad for class 10, olympiad for class 11, olympiad for class 12, Olympia-X subjects, Physics Olympiad 2025, Chemistry Olympiad 2025, Math Olympiad 2025, Biology Olympiad 2025, science olympiad India, maths olympiad India, student competitions India, online olympiad exam, academic scholarships, education platform India, school scholarship exams 2025, competitive exams for students, talent exams India, OLP program, scholarship program 2025 , CBSE , ICSE , State Board , Sample Paper",
   openGraph: {
     title: "Schoozy Edutech – Uplifting Futures",
     description:
