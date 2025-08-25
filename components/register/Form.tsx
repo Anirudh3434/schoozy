@@ -451,6 +451,15 @@ const handleSubmit = async () => {
     return { success: true, data: registerResp.data }
   } catch (e: any) {
     console.error("Registration failed:", e)
+    if( e.response?.data?.error === "Registration already exists"){
+      toast({
+        title: "Registration Failed",
+        description: "You are already registered for the Olympia-X exam.",
+        variant: "destructive",
+      })
+
+      router.push("/profile")
+    }
     return { success: false, error: e }
   }
 }
