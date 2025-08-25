@@ -1,8 +1,11 @@
+"use client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Trophy, Users, Award, Target } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function OlympiaOverview() {
+  const router = useRouter()
   return (
     <section className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -26,6 +29,7 @@ export function OlympiaOverview() {
 
             <div className="flex flex-col sm:flex-row gap-4">
               <Button
+                onClick={()=> router.push("/olympia-x-register")}
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold rounded-full"
               >
@@ -80,3 +84,4 @@ export function OlympiaOverview() {
     </section>
   )
 }
+

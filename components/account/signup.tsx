@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 export default function SignUpForm() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [message, setMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -25,6 +26,8 @@ export default function SignUpForm() {
     // Client-side validation
     if (!name.trim()) return setError("Name is required")
     if (!email.trim()) return setError("Email is required")
+    if (!phone.trim()) return setError("Phone number is required")
+    if (!/^\d{10,15}$/.test(phone.trim())) return setError("Enter a valid phone number")
     if (password.length < 6) return setError("Password must be at least 6 characters long")
 
     try {
@@ -34,7 +37,9 @@ export default function SignUpForm() {
       })
 
       setMessage("OTP sent! Redirecting...")
-      router.push(`/otp-verify?email=${encodeURIComponent(email.trim())}&name=${encodeURIComponent(name.trim())}&pass=${encodeURIComponent(password)}`)
+      router.push(
+        `/otp-verify?email=${encodeURIComponent(email.trim())}&name=${encodeURIComponent(name.trim())}&phone=${encodeURIComponent(phone.trim())}&pass=${encodeURIComponent(password)}`
+      )
     } catch (error: any) {
       console.error("OTP sending error:", error.response?.data || error.message)
       setMessage(error.response?.data?.message || "Failed to send OTP. Please try again.")
@@ -98,6 +103,21 @@ export default function SignUpForm() {
               />
             </div>
 
+            {/* Phone Field */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="10-digit"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={isLoading}
+                maxLength={15}
+              />
+              <p className="text-xs text-gray-500">Enter a valid phone number (digits only)</p>
+            </div>
+
             {/* Password Field */}
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -138,7 +158,7 @@ export default function SignUpForm() {
           {/* Login Link */}
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="underline text-blue-600 hover:text-purple-600">
+            <Link href="/login-account" className="underline text-blue-600 hover:text-purple-600">
               Login
             </Link>
           </div>

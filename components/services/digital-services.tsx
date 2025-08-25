@@ -1,30 +1,24 @@
-import { Globe, TrendingUp, Palette, Database } from "lucide-react"
+import { Database, Trophy, GraduationCap } from "lucide-react"
 
 export function DigitalServices() {
   const services = [
-    {
-      icon: <Globe className="w-8 h-8 text-blue-600" />,
-      title: "Website Designing",
-      progress: 90,
-      color: "bg-blue-600",
-    },
-    {
-      icon: <TrendingUp className="w-8 h-8 text-green-600" />,
-      title: "Digital Marketing",
-      progress: 85,
-      color: "bg-green-600",
-    },
-    {
-      icon: <Palette className="w-8 h-8 text-purple-600" />,
-      title: "UI/UX Designing",
-      progress: 80,
-      color: "bg-purple-600",
-    },
     {
       icon: <Database className="w-8 h-8 text-orange-600" />,
       title: "IMS",
       progress: 95,
       color: "bg-orange-600",
+    },
+    {
+      icon: <Trophy className="w-8 h-8 text-blue-600" />,
+      title: "Olympia-X",
+      progress: 90,
+      color: "bg-blue-600",
+    },
+    {
+      icon: <GraduationCap className="w-8 h-8 text-green-600" />,
+      title: "Student Counseling",
+      progress: 85,
+      color: "bg-green-600",
     },
   ]
 
@@ -38,8 +32,8 @@ export function DigitalServices() {
               OUR SERVICES
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-8 leading-tight">
-              We Create Websites And Campaigns That Expose New
-              <span className="text-blue-600"> Opportunities</span>
+              Empowering Education And Growth With Our{" "}
+              <span className="text-blue-600">Core Services</span>
             </h2>
 
             {/* Services List */}
@@ -49,8 +43,12 @@ export function DigitalServices() {
                   <div className="flex-shrink-0">{service.icon}</div>
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{service.title}</h3>
-                      <span className="text-sm text-gray-600">{service.progress}%</span>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {service.title}
+                      </h3>
+                      <span className="text-sm text-gray-600">
+                        {service.progress}%
+                      </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
@@ -67,7 +65,7 @@ export function DigitalServices() {
           {/* Right Image */}
           <div className="relative">
             <div className="relative w-full h-96 bg-gradient-to-br from-blue-100 to-purple-100 rounded-3xl overflow-hidden">
-              <div className="absolute inset-0 bg-[url('/placeholder.svg?height=400&width=600')] bg-cover bg-center opacity-80"></div>
+              <div className="absolute inset-0 bg-[url('https://registeration-docs.s3.us-east-1.amazonaws.com/image.png')] bg-cover bg-center opacity-80"></div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
             </div>
             {/* Floating Elements */}

@@ -15,7 +15,6 @@ export default function OlympiaXPage() {
         <OlympiaOverview />
         <SubjectSections />
         <ExamDetails />
-        <ContactSection />
       </main>
      
     </div>

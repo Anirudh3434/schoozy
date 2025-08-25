@@ -153,7 +153,7 @@ export function ContactSection() {
                 <Mail className="w-6 h-6 text-blue-600 mt-1 mr-4 flex-shrink-0" />
                 <div>
                   <h4 className="text-xl font-bold text-gray-900 mb-2">Email</h4>
-                  <p className="text-gray-600">Hello@Schoozy.in</p>
+                  <p className="text-gray-600">info@schoozy.in</p>
                 </div>
               </div>
 
@@ -161,7 +161,7 @@ export function ContactSection() {
                 <Phone className="w-6 h-6 text-blue-600 mt-1 mr-4 flex-shrink-0" />
                 <div>
                   <h4 className="text-xl font-bold text-gray-900 mb-2">Call Us</h4>
-                  <p className="text-gray-600">+91-7988539901</p>
+                  <p className="text-gray-600">+91-9817939901</p>
                 </div>
               </div>
 
@@ -169,7 +169,7 @@ export function ContactSection() {
                 <MapPin className="w-6 h-6 text-blue-600 mt-1 mr-4 flex-shrink-0" />
                 <div>
                   <h4 className="text-xl font-bold text-gray-900 mb-2">Office</h4>
-                  <p className="text-gray-600">Hello@Schoozy.in</p>
+                  <p className="text-gray-600">Schoozy Edutech Pvt Ltd, Plot No. 378, Industrial Area, Phase 8B, Sector 74, Mohali, Punjab, 160074.</p>
                 </div>
               </div>
             </div>
@@ -179,3 +179,4 @@ export function ContactSection() {
     </section>
   )
 }
+

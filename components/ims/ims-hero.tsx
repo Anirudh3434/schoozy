@@ -11,9 +11,9 @@ export function IMSHero() {
               <span className="text-blue-600 font-semibold text-lg">Institute Management System</span>
             </div>
 
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-8 leading-tight">
+            <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-8 leading-tight">
               Simplify, Streamline, <span className="text-blue-600">Succeed</span>
-            </h1>
+            </h2>
 
             <div className="space-y-6 mb-8">
               <p className="text-xl text-gray-600 leading-relaxed">

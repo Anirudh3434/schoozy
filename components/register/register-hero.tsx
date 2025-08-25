@@ -9,11 +9,11 @@ export function RegisterHero() {
       <div className="absolute bottom-20 right-20 w-32 h-32 bg-purple-500/20 rounded-full blur-xl animate-pulse delay-1000"></div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold mb-6">
+        <h2 className="text-5xl md:text-6xl font-bold mb-6">
           <span className="bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
             You Are Few Steps Away From Heading Into India's Biggest Talent Hunt Exam
           </span>
-        </h1>
+        </h2>
         <p className="text-lg md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
           OLYMPIA-X 2025
         </p>

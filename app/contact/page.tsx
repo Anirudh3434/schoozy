@@ -10,8 +10,8 @@ export default function ContactPage() {
 
       <main>
         <ContactHero />
-        <ContactForm />
         <ContactPartnership />
+	 <ContactForm />
       </main>
 
     </div>

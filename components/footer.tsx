@@ -8,9 +8,7 @@ export function Footer() {
           {/* Company Info */}
           <div className="lg:col-span-2">
             <div className="flex items-center mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-white font-bold text-xl">SE</span>
-              </div>
+            
               <div>
                 <h3 className="text-xl font-bold">Schoozy Edutech</h3>
                 <p className="text-sm text-gray-400">Private Limited</p>
@@ -67,11 +65,7 @@ export function Footer() {
                   IMS
                 </a>
               </li>
-              <li>
-                <a href="/events" className="text-gray-300 hover:text-white transition-colors duration-200">
-                  Events
-                </a>
-              </li>
+             
               <li>
                 <a href="/contact" className="text-gray-300 hover:text-white transition-colors duration-200">
                   Contact Us

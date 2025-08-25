@@ -21,6 +21,7 @@ export default function EmailOtpForm() {
   const name = searchParams?.get("name") || "";
   const email = searchParams?.get("email") || "";
   const password = searchParams?.get("pass") || "";
+  const phone_number = searchParams?.get("phone") || "";
 
   console.log(name , email , password)
 
@@ -72,6 +73,7 @@ export default function EmailOtpForm() {
         name,
         email,
         password,
+	phone_number
       });
 
       if (registerResp.status === 201 || registerResp.data?.user) {
@@ -181,4 +183,5 @@ export default function EmailOtpForm() {
     </div>
   );
 }
+
 

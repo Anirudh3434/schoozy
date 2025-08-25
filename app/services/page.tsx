@@ -15,7 +15,7 @@ export default function ServicesPage() {
         <ServiceOverview />
         <DigitalServices />
         <IMSSection />
-        <PortfolioSection />
+ 
       </main>
    
     </div>

@@ -1,7 +1,7 @@
 import { Header } from "@/components/header"
 import { RegisterHero } from "@/components/register/register-hero"
 import { Footer } from "@/components/footer"
-import OlympiaXRegisterPage from "@/components/register/Form"
+import OlympiaXRegistrationForm from "@/components/register/Form"
 
 export default function OlympiaXRegister() {
   return (
@@ -9,7 +9,7 @@ export default function OlympiaXRegister() {
 
       <main>
         <RegisterHero />
-        <OlympiaXRegisterPage/>
+        <OlympiaXRegistrationForm/>
       </main>
   
     </div>

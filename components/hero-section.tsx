@@ -78,8 +78,7 @@ export function HeroSection() {
 
           {/* Subtitle */}
           <p className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto leading-relaxed">
-            Join thousands of students in our comprehensive scholarship examination program designed for classes 8-10
-            and 11-12
+            Join thousands of students in our comprehensive scholarship examination program designed for classes 8-12
           </p>
 
           {/* CTA Buttons */}
@@ -113,8 +112,8 @@ export function HeroSection() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600/20 rounded-full mb-4">
                 <Trophy className="w-8 h-8 text-purple-300" />
               </div>
-              <div className="text-3xl font-bold text-white mb-2">95%</div>
-              <div className="text-gray-300">Success Rate</div>
+              <div className="text-3xl font-bold text-white mb-2">₹ 1Cr+</div>
+              <div className="text-gray-300">Rewards</div>
             </div>
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-cyan-600/20 rounded-full mb-4">
@@ -127,8 +126,8 @@ export function HeroSection() {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600/20 rounded-full mb-4">
                 <GraduationCap className="w-8 h-8 text-green-300" />
               </div>
-              <div className="text-3xl font-bold text-white mb-2">500+</div>
-              <div className="text-gray-300">Scholarships</div>
+              <div className="text-3xl font-bold text-white mb-2">100+</div>
+              <div className="text-gray-300">Schools</div>
             </div>
           </div>
         </div>
