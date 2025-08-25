@@ -98,7 +98,12 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
   const [studentName, setStudentName] = useState("Student")
   const [examEndTime, setExamEndTime] = useState<Date | null>(null)
   const [timeLeft, setTimeLeft] = useState("")
-  const [TimeTaken, setTimeTaken] = useState(0)
+  
+  // Fixed time tracking states
+  const [timeTaken, setTimeTaken] = useState(0)
+  const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now())
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Proctoring states
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [violations, setViolations] = useState<CheatingViolation[]>([])
@@ -140,6 +145,61 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
   // Check if tracking should be paused
   const isTrackingPaused = showWarningPopup || showSuspendPopup || isExamSuspended
+
+  // Timer management for question time tracking
+  useEffect(() => {
+    // Clear existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+
+    // Reset time taken and start time for new question
+    setTimeTaken(0)
+    setQuestionStartTime(Date.now())
+
+    // Start new timer - only if exam is not suspended or paused
+    if (!isExamSuspended && !isTrackingPaused) {
+      timerRef.current = setInterval(() => {
+        setTimeTaken(prev => prev + 1)
+      }, 1000)
+    }
+
+    // Cleanup on unmount or question change
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [examState.currentQuestion, isExamSuspended, isTrackingPaused])
+
+  // Pause/resume timer based on tracking state
+  useEffect(() => {
+    if (isTrackingPaused || isExamSuspended) {
+      // Pause timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    } else {
+      // Resume timer if not already running
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => {
+          setTimeTaken(prev => prev + 1)
+        }, 1000)
+      }
+    }
+  }, [isTrackingPaused, isExamSuspended])
+
+  // Clean up timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [])
 
   // Camera permission and setup
   const requestCameraPermission = useCallback(async () => {
@@ -221,11 +281,6 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
       return false
     }
   }, [])
-
-
-  setInterval(() => {
-     setTimeTaken((prev: number) => prev + 1)
-  }, 1000);
 
   // Verify models are properly loaded
   const verifyModelsLoaded = useCallback(() => {
@@ -618,17 +673,12 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
       if (response.data && response.data.success) {
         const apiData: ApiResponse = response.data
         setCurrentApiQuestion(apiData.question)
-        setTimeTaken(0)
 
         if (apiData.total_questions) {
           setTotalQuestions(apiData.total_questions)
-
         }
 
         return apiData.question
-
-
-
       } else {
         throw new Error(response.data?.message || "Failed to fetch question")
       }
@@ -847,7 +897,6 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
   }, [examState.timeRemaining, examState.isSubmitted])
 
-
   const getCurrentQuestion = () => {
     return examState.questions[examState.currentQuestion - 1]
   }
@@ -886,6 +935,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     setSelectedAnswer(optionIndex)
   }
 
+  // Modified saveResponse function with fixed time tracking
   const saveResponse = async () => {
     if (!currentApiQuestion || isExamSuspended) return
 
@@ -894,7 +944,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
         question_number: examState.currentQuestion,
         question_id: currentApiQuestion.question_id,
         answer: selectedAnswer !== null ? optionIndexToLetter(selectedAnswer) : "",
-        time_taken: TimeTaken,
+        time_taken: timeTaken, // Fixed: using correct variable name
       }, {
         withCredentials: true
       })
@@ -1015,7 +1065,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
   }
 
-    useEffect(() => {
+  useEffect(() => {
     if (!examEndTime) return
 
     const interval = setInterval(() => {
@@ -1040,7 +1090,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     verifyCheck()
   }, [])
 
-    useEffect(() => {
+  useEffect(() => {
     if (timeLeft === "Exam Finished" || timeLeft === 0) {
       alert("Time up!")
       router.push("/")
@@ -1284,6 +1334,9 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
                     </span>
                     <span>
                       Marks: <span className="font-medium">{currentApiQuestion.marks}</span>
+                    </span>
+                    <span>
+                      Time: <span className="font-medium">{Math.floor(timeTaken / 60)}m {timeTaken % 60}s</span>
                     </span>
                   </div>
                 )}
@@ -1597,4 +1650,3 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     </div>
   )
 }
-

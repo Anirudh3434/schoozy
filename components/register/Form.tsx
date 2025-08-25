@@ -1063,7 +1063,7 @@ if (isRegisteredForOlympiad) {
       <Check className="w-20 h-20 text-green-500 mb-6" />
       <h2 className="text-3xl font-bold text-gray-900 mb-4">Already Registered!</h2>
       <p className="text-gray-700 mb-6">You have successfully registered for the Olympia-X exam.</p>
-      <Button onClick={() => router.push("/")}>Go to Home</Button>
+      <Button onClick={() => router.push("/profile")}>Go to Profile</Button>
     </div>
   )
 }
