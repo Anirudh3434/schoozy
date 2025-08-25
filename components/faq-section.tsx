@@ -89,7 +89,7 @@ export function FAQSection() {
         {/* Contact CTA */}
         <div className="text-center mt-16">
           <p className="text-gray-600 mb-6">Still have questions? We're here to help!</p>
-          <button onClick={()=> router.push("/contact-us")} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-semibold transition-colors duration-300">
+          <button onClick={()=> router.push("/contact")} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-semibold transition-colors duration-300">
             Contact Support
           </button>
         </div>
