@@ -8,6 +8,7 @@ import "@tensorflow/tfjs" // must import this once
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { ExamState, ExamConfig, Question, ExamStats } from "@/types/exam"
+import { EXAM_API_BASE } from "@/lib/exam-api"
 import axios from "axios"
 import Webcam from "react-webcam"
 
@@ -235,7 +236,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
   const logViolationToServer = async (violation: CheatingViolation) => {
     try {
-      await axios.post("https://schoozy.in/api/exam/log-violation", {
+      await axios.post(`${EXAM_API_BASE}/log-violation`, {
         violation_type: violation.type,
         timestamp: violation.timestamp,
         severity: violation.severity,
@@ -339,7 +340,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     setLoadingQuestion(true)
     setError(null)
     try {
-      const response = await axios.get("https://schoozy.in/api/exam/get-question", {
+      const response = await axios.get(`${EXAM_API_BASE}/get-question`, {
         withCredentials: true,
         params: {
           question_number: questionNumber,
@@ -512,7 +513,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     if (!currentApiQuestion || isExamSuspended) return
 
     try {
-      const response = await axios.post("https://schoozy.in/api/exam/submit-answer", {
+      const response = await axios.post(`${EXAM_API_BASE}/submit-answer`, {
         question_number: examState.currentQuestion,
         question_id: currentApiQuestion.question_id,
         answer: selectedAnswer !== null ? String.fromCharCode(65 + selectedAnswer) : "",

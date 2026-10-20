@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import * as faceapi from "face-api.js"
+import { FaceDetector, FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision"
+import * as cocoSsd from "@tensorflow-models/coco-ssd"
+import "@tensorflow/tfjs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { ExamState, ExamConfig, Question, ExamStats } from "@/types/exam"
+import { EXAM_API_BASE } from "@/lib/exam-api"
 import axios from "axios"
 import Webcam from "react-webcam"
 import { useRouter } from "next/navigation"
@@ -58,11 +61,13 @@ interface AttemptedQuestionsResponse {
 }
 
 interface CheatingViolation {
-  type: "face_not_detected" | "multiple_faces" | "tab_switch" | "fullscreen_exit" | "suspicious_movement"
+  type: "face_not_detected" | "face_absent" | "multiple_faces" | "tab_switch" | "fullscreen_exit" | "suspicious_movement" | "copy_paste" | "context_menu" | "text_select" | "looking_away" | "phone_detected" | "audio_detected"
   timestamp: number
   severity: "low" | "medium" | "high"
   description: string
 }
+
+type WarningType = "multiple_faces" | "tab_switch" | "face_absent" | "fullscreen_exit"
 
 interface FaceDetectionResult {
   faces: number
@@ -78,6 +83,8 @@ interface FaceDetectionResult {
 interface WarningCounts {
   multipleFaces: number
   tabSwitch: number
+  faceAbsent: number
+  fullscreenExits: number
   total: number
 }
 
@@ -122,6 +129,8 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
   const [warningCounts, setWarningCounts] = useState<WarningCounts>({
     multipleFaces: 0,
     tabSwitch: 0,
+    faceAbsent: 0,
+    fullscreenExits: 0,
     total: 0
   })
   const [showSuspendPopup, setShowSuspendPopup] = useState(false)
@@ -133,15 +142,84 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     count: number
   } | null>(null)
 
-  // Face detection refs
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  // Vision/proctoring refs (MediaPipe Tasks Vision)
   const detectionIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const detectionBufferRef = useRef<number[]>([])
   const modelLoadedRef = useRef(false)
+  const faceDetectorRef = useRef<FaceDetector | null>(null)
+  const faceLandmarkerRef = useRef<FaceLandmarker | null>(null)
+  const objectModelRef = useRef<cocoSsd.ObjectDetection | null>(null)
+  const audioRef = useRef<{ ctx: AudioContext; analyser: AnalyserNode; stream: MediaStream; loudStreak: number } | null>(null)
 
   // Detection parameters
-  const DETECTION_BUFFER_SIZE = 5
-  const CONFIDENCE_THRESHOLD = 0.5
+  const FACE_SCORE_THRESHOLD = 0.5
+  const NO_FACE_TICKS_FOR_WARNING = 5 // ~10s at 2s cadence
+  const AWAY_TICKS_FOR_FLAG = 3 // ~6s of sustained looking-away
+  const OBJECT_CHECK_EVERY_MS = 5000
+  const AUDIO_RMS_THRESHOLD = 25 // 0-255 scale on time-domain data
+  const AUDIO_STREAK_FOR_FLAG = 3
+
+  // Attention-tracking streaks
+  const noFaceStreakRef = useRef(0)
+  const awayStreakRef = useRef(0)
+  const lastObjectCheckRef = useRef(0)
+
+  // Explicit identity for the exam API (cookie sessions are unreliable
+  // across localhost ports, so every request carries these as fallback)
+  const studentEmail = examState.student?.email ?? ""
+  const studentExamId = examState.student?.examId ?? ""
+
+  // Fresh identity mirror for stable callbacks defined below
+  const studentCredsRef = useRef({ email: "", exam_id: "" })
+  studentCredsRef.current = { email: studentEmail, exam_id: studentExamId }
+  // Per-type throttle so a stuck signal (e.g. no face) doesn't spam the API
+  const lastViolationSentRef = useRef<Record<string, number>>({})
+  // Late-bound warning dispatcher: detectFrame is defined before triggerWarning
+  const triggerWarningRef = useRef<((type: WarningType, description: string) => void) | null>(null)
+
+  const logViolationToServer = useCallback(async (
+    violation: CheatingViolation,
+    opts?: { snapshot?: boolean; throttleMs?: number },
+  ) => {
+    try {
+      const now = Date.now()
+      const last = lastViolationSentRef.current[violation.type] || 0
+      if (now - last < (opts?.throttleMs ?? 10_000)) return
+      lastViolationSentRef.current[violation.type] = now
+
+      let snapshot: string | undefined
+      if (opts?.snapshot !== false) {
+        try {
+          snapshot = webcamRef.current?.getScreenshot() || undefined
+        } catch {
+          // camera may be unavailable - log without evidence
+        }
+      }
+
+      await axios.post(`${EXAM_API_BASE}/log-violation`, {
+        email: studentCredsRef.current.email,
+        exam_id: studentCredsRef.current.exam_id,
+        violation_type: violation.type,
+        timestamp: violation.timestamp,
+        severity: violation.severity,
+        description: violation.description,
+        snapshot,
+      }, { withCredentials: true })
+    } catch (error) {
+      console.error("Failed to log violation:", error)
+    }
+  }, [])
+
+  const addViolation = useCallback((violation: CheatingViolation) => {
+    setViolations((prev) => [...prev, violation])
+    setCurrentViolation(violation)
+
+    setTimeout(() => {
+      setCurrentViolation(null)
+    }, 5000)
+
+    // Persist to the backend (evidence trail for proctors)
+    logViolationToServer(violation)
+  }, [logViolationToServer])
 
   // Check if tracking should be paused
   const isTrackingPaused = showWarningPopup || showSuspendPopup || isExamSuspended
@@ -191,15 +269,112 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
   }, [isTrackingPaused, isExamSuspended])
 
-  // Clean up timer on component unmount
+  // Clean up timers, tracking and media on component unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
+      if (detectionIntervalRef.current) {
+        clearInterval(detectionIntervalRef.current)
+        detectionIntervalRef.current = null
+      }
+      const a = audioRef.current
+      if (a) {
+        try {
+          a.stream.getTracks().forEach((t) => t.stop())
+          a.ctx.close()
+        } catch {
+          // already torn down
+        }
+        audioRef.current = null
+      }
+      try {
+        faceDetectorRef.current?.close()
+        faceLandmarkerRef.current?.close()
+      } catch {
+        // already torn down
+      }
     }
   }, [])
+
+  // Live mirror of the current answer draft for the unload autosave
+  const draftRef = useRef<{ qid: number | null; qnum: number; ans: number | null }>({ qid: null, qnum: 1, ans: null })
+  draftRef.current = {
+    qid: currentApiQuestion?.question_id ?? null,
+    qnum: examState.currentQuestion,
+    ans: selectedAnswer,
+  }
+
+  // Content-theft guards + presence heartbeat + close-tab autosave
+  useEffect(() => {
+    const flag = (vtype: CheatingViolation["type"], desc: string, prevent: boolean) => (e: Event) => {
+      if (prevent) e.preventDefault()
+      const v: CheatingViolation = { type: vtype, timestamp: Date.now(), severity: "medium", description: desc }
+      setCurrentViolation(v)
+      setTimeout(() => setCurrentViolation(null), 4000)
+      logViolationToServer(v)
+    }
+    const onCopy = flag("copy_paste", "Attempted to copy exam content", true)
+    const onPaste = flag("copy_paste", "Attempted to paste into exam", true)
+    const onCut = flag("copy_paste", "Attempted to cut exam content", true)
+    const onMenu = flag("context_menu", "Opened right-click menu during exam", true)
+    const onSelect = flag("text_select", "Selected exam text", false)
+    document.addEventListener("copy", onCopy)
+    document.addEventListener("paste", onPaste)
+    document.addEventListener("cut", onCut)
+    document.addEventListener("contextmenu", onMenu)
+    document.addEventListener("selectstart", onSelect)
+
+    // Presence heartbeat every 30s; also honours server-driven suspension
+    // (a proctor can suspend from the dashboard mid-exam)
+    const beat = async () => {
+      try {
+        const res = await axios.post(`${EXAM_API_BASE}/heartbeat`, {
+          email: studentCredsRef.current.email,
+          exam_id: studentCredsRef.current.exam_id,
+        }, { withCredentials: true })
+        if (res.data?.exam_status === "Suspended") setIsExamSuspended(true)
+        if (res.data?.exam_status === "Completed") router.push("/")
+      } catch {
+        // offline tolerated - heartbeat is best-effort
+      }
+    }
+    const beatId = setInterval(beat, 30_000)
+
+    // Autosave the current draft if the tab is closed/refreshed
+    const onUnload = () => {
+      const d = draftRef.current
+      if (d.qid == null || d.ans == null) return
+      try {
+        navigator.sendBeacon(
+          `${EXAM_API_BASE}/submit-answer`,
+          new Blob([JSON.stringify({
+            email: studentCredsRef.current.email,
+            exam_id: studentCredsRef.current.exam_id,
+            question_number: d.qnum,
+            question_id: d.qid,
+            answer: optionIndexToLetter(d.ans),
+            time_taken: 0,
+          })], { type: "application/json" }),
+        )
+      } catch {
+        // unload path - nothing else we can do
+      }
+    }
+    window.addEventListener("beforeunload", onUnload)
+
+    return () => {
+      document.removeEventListener("copy", onCopy)
+      document.removeEventListener("paste", onPaste)
+      document.removeEventListener("cut", onCut)
+      document.removeEventListener("contextmenu", onMenu)
+      document.removeEventListener("selectstart", onSelect)
+      clearInterval(beatId)
+      window.removeEventListener("beforeunload", onUnload)
+    }
+  }, [logViolationToServer, router])
 
   // Camera permission and setup
   const requestCameraPermission = useCallback(async () => {
@@ -229,53 +404,67 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
   }, [])
 
-  // Load face-api.js models with proper error handling
+  // Load MediaPipe Tasks Vision models (face detector + face landmarker for
+  // presence counting, gaze and head-pose attention tracking)
   const loadModels = useCallback(async () => {
     try {
-      console.log("Loading face-api.js models...")
-      
-      // Test if model files are accessible
-      const testModelAccess = async (path: string) => {
-        try {
-          const response = await fetch(path)
-          if (!response.ok) {
-            throw new Error(`Model file not accessible: ${path} (Status: ${response.status})`)
-          }
-          return true
-        } catch (error) {
-          console.error(`Failed to access model file: ${path}`, error)
-          return false
-        }
-      }
+      console.log("Loading MediaPipe vision models...")
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.0/wasm"
+      )
 
-      // Test all model files
-      const modelPaths = [
-        "/models/tiny_face_detector_model-weights_manifest.json",
-        "/models/face_landmark_68_model-weights_manifest.json",
-        "/models/face_expression_model-weights_manifest.json"
-      ]
-
-      for (const path of modelPaths) {
-        const accessible = await testModelAccess(path)
-        if (!accessible) {
-          throw new Error(`Model file not accessible: ${path}. Check file permissions.`)
-        }
-      }
-
-      console.log("Model files accessible, loading...")
-
-      // Load models
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri("/models"),
-        faceapi.nets.faceLandmark68Net.loadFromUri("/models"),
-        faceapi.nets.faceExpressionNet.loadFromUri("/models")
+      const [detector, landmarker] = await Promise.all([
+        FaceDetector.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+        }),
+        FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+          numFaces: 1,
+        }),
       ])
-      
+
+      faceDetectorRef.current = detector
+      faceLandmarkerRef.current = landmarker
       modelLoadedRef.current = true
-      console.log("All face-api.js models loaded successfully")
+      console.log("MediaPipe vision models loaded successfully")
+
+      // Secondary-device detector (phones/laptops/books) - best effort
+      try {
+        const coco = await cocoSsd.load()
+        objectModelRef.current = coco
+        console.log("Object detection model loaded")
+      } catch (objErr) {
+        console.warn("Object detection unavailable:", objErr)
+      }
+
+      // Ambient-audio monitor - best effort (needs mic permission)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const Ctx = window.AudioContext || (window as any).webkitAudioContext
+        const ctx: AudioContext = new Ctx()
+        const src = ctx.createMediaStreamSource(stream)
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 512
+        src.connect(analyser)
+        audioRef.current = { ctx, analyser, stream, loudStreak: 0 }
+        console.log("Audio monitoring enabled")
+      } catch (audioErr) {
+        console.warn("Audio monitoring unavailable (mic denied?)", audioErr)
+      }
+
       return true
     } catch (error) {
-      console.error("Failed to load face-api.js models:", error)
+      console.error("Failed to load vision models:", error)
       const errorMsg = error instanceof Error ? error.message : "Model loading failed"
       setError(`Face detection setup failed: ${errorMsg}`)
       return false
@@ -284,27 +473,17 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
   // Verify models are properly loaded
   const verifyModelsLoaded = useCallback(() => {
-    try {
-      const requiredNets = [
-        faceapi.nets.tinyFaceDetector,
-        faceapi.nets.faceLandmark68Net,
-        faceapi.nets.faceExpressionNet
-      ]
-      
-      const allLoaded = requiredNets.every(net => net.isLoaded)
-      console.log("Models verification:", allLoaded)
-      return allLoaded
-    } catch (error) {
-      console.error("Model verification error:", error)
-      return false
-    }
+    const ready = !!faceDetectorRef.current && !!faceLandmarkerRef.current
+    console.log("Models verification:", ready)
+    return ready
   }, [])
 
   // Get attempted questions API
   const getAttemptedQuestions = useCallback(async () => {
     try {
-      const response = await axios.get("https://schoozy.in/api/exam/submit-answer-info", {
-        withCredentials: true
+      const response = await axios.get(`${EXAM_API_BASE}/submit-answer-info`, {
+        withCredentials: true,
+        params: { email: studentEmail, exam_id: studentExamId },
       })
       
       if (response.data && response.data.success) {
@@ -326,7 +505,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
       console.error("Failed to retrieve attempted questions:", error)
       return null
     }
-  }, [])
+  }, [studentEmail, studentExamId])
 
   // Helper function to convert option letter to index (A=0, B=1, C=2, D=3)
   const optionLetterToIndex = (letter: string): number => {
@@ -361,8 +540,107 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     onUpdateState({ questions: updatedQuestions })
   }, [examState.questions, onUpdateState])
 
-  // Face detection with improved error handling
-  const detectFaces = useCallback(async () => {
+  // Attention analysis from FaceLandmarker landmarks (478-pt topology).
+  // Returns true when the student is looking away from the screen:
+  // sideways head yaw, downward gaze (phone-in-lap), or sideways iris drift.
+  const isLookingAway = useCallback((landmarks: { x: number; y: number }[]) => {
+    try {
+      const lxOuter = landmarks[33]
+      const lxInner = landmarks[133]
+      const rxInner = landmarks[362]
+      const rxOuter = landmarks[263]
+      const nose = landmarks[1]
+      const lIris = landmarks[468]
+      const rIris = landmarks[473]
+      // Eyelid vertical references: upper 159/386, lower 145/374
+      const lTop = landmarks[159]
+      const lBot = landmarks[145]
+      const rTop = landmarks[386]
+      const rBot = landmarks[374]
+      if (!lxOuter || !rxOuter || !nose || !lIris || !rIris || !lTop || !lBot || !rTop || !rBot) return false
+
+      const eyeW = Math.abs(rxOuter.x - lxOuter.x) || 1e-6
+      const eyeMidX = (lxOuter.x + rxOuter.x) / 2
+
+      // Head yaw proxy: nose offset from eye midpoint, normalised by eye width
+      const yaw = (nose.x - eyeMidX) / eyeW
+      if (Math.abs(yaw) > 0.3) return true
+
+      // Horizontal iris drift per eye
+      const drift = (iris: { x: number }, outer: { x: number }, inner: { x: number }) => {
+        const t = (iris.x - outer.x) / ((inner.x - outer.x) || 1e-6)
+        return Math.abs(t - 0.5)
+      }
+      if (drift(lIris, lxOuter, lxInner) > 0.3 && drift(rIris, rxOuter, rxInner) > 0.3) return true
+
+      // Downward gaze (both irises low inside the eyelid opening)
+      const downRatio = (iris: { y: number }, top: { y: number }, bot: { y: number }) =>
+        (iris.y - (top.y + bot.y) / 2) / (Math.abs(bot.y - top.y) || 1e-6)
+      if (downRatio(lIris, lTop, lBot) > 0.45 && downRatio(rIris, rTop, rBot) > 0.45) return true
+
+      return false
+    } catch {
+      return false
+    }
+  }, [])
+
+  // Ambient-audio sampling: sustained loudness suggests speech in the room
+  const sampleAudio = useCallback(() => {
+    const a = audioRef.current
+    if (!a) return
+    try {
+      const data = new Uint8Array(a.analyser.fftSize)
+      a.analyser.getByteTimeDomainData(data)
+      let sum = 0
+      for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128
+        sum += v * v
+      }
+      const rms = Math.sqrt(sum / data.length) * 128
+      if (rms > AUDIO_RMS_THRESHOLD) {
+        a.loudStreak += 1
+        if (a.loudStreak >= AUDIO_STREAK_FOR_FLAG) {
+          a.loudStreak = 0
+          addViolation({
+            type: "audio_detected",
+            timestamp: Date.now(),
+            severity: "medium",
+            description: "Sustained audio detected near the microphone - possible speech",
+          })
+        }
+      } else {
+        a.loudStreak = 0
+      }
+    } catch {
+      // analyser unavailable - skip silently
+    }
+  }, [addViolation])
+
+  // Secondary-device sweep (phones/laptops/books) every OBJECT_CHECK_EVERY_MS
+  const checkForDevices = useCallback(async (video: HTMLVideoElement) => {
+    const model = objectModelRef.current
+    if (!model) return
+    try {
+      const preds = await model.detect(video)
+      const hit = preds.find(
+        (p) => ["cell phone", "laptop", "book"].includes(p.class) && p.score > 0.5
+      )
+      if (hit) {
+        addViolation({
+          type: "phone_detected",
+          timestamp: Date.now(),
+          severity: "high",
+          description: `Possible secondary device in view: ${hit.class} (${Math.round(hit.score * 100)}%)`,
+        })
+      }
+    } catch (error) {
+      console.error("Object detection error:", error)
+    }
+  }, [addViolation])
+
+  // Main tracking tick (every 2s): face count -> absence escalation ->
+  // gaze/head attention -> audio sample. Device sweep runs on its own cadence.
+  const detectFrame = useCallback(async () => {
     // Early exit conditions - now includes popup checks
     if (!isCameraReady || !modelLoadedRef.current || isTrackingPaused) {
       return
@@ -374,115 +652,118 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
     try {
       const video = webcamRef.current.video
-      
+
       // Check video readiness
       if (video.readyState !== 4 || video.videoWidth === 0 || video.videoHeight === 0) {
         return
       }
 
-      // Perform face detection
-      const detections = await faceapi
-        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({
-          inputSize: 416,
-          scoreThreshold: CONFIDENCE_THRESHOLD
-        }))
-        .withFaceLandmarks()
-        .withFaceExpressions()
+      const detector = faceDetectorRef.current
+      if (!detector) return
+      const nowMs = performance.now()
+      const faceRes = detector.detectForVideo(video, nowMs)
+      const faces = (faceRes.detections || []).filter(
+        (d) => (d.categories?.[0]?.score ?? 0) >= FACE_SCORE_THRESHOLD
+      )
+      const faceCount = faces.length
+      const avgConfidence = faceCount > 0
+        ? faces.reduce((s, d) => s + (d.categories?.[0]?.score ?? 0), 0) / faceCount
+        : 0
 
-      let faceCount = detections.length
-      let totalConfidence = 0
+      setFaceDetectionResult({
+        faces: faceCount,
+        confidence: avgConfidence,
+        detectionQuality: avgConfidence > 0.8 ? "high" : avgConfidence > 0.6 ? "medium" : "low",
+        frameAnalysis: {
+          skinPixels: 0,
+          faceRegions: faceCount,
+          movementDetected: false
+        }
+      })
 
-      if (faceCount > 0) {
-        totalConfidence = detections.reduce((sum, d) => sum + d.detection.score, 0)
-      }
-
-      const avgConfidence = faceCount > 0 ? totalConfidence / faceCount : 0
-
-      // Update detection buffer
-      detectionBufferRef.current.push(faceCount)
-      if (detectionBufferRef.current.length > DETECTION_BUFFER_SIZE) {
-        detectionBufferRef.current.shift()
-      }
-
-      // Process detection results when buffer is full
-      if (detectionBufferRef.current.length >= DETECTION_BUFFER_SIZE) {
-        const avgFaces = detectionBufferRef.current.reduce((a, b) => a + b, 0) / DETECTION_BUFFER_SIZE
-        const roundedFaces = Math.round(avgFaces)
-
-        setFaceDetectionResult({
-          faces: roundedFaces,
-          confidence: avgConfidence,
-          detectionQuality: avgConfidence > 0.8 ? "high" : avgConfidence > 0.6 ? "medium" : "low",
-          frameAnalysis: {
-            skinPixels: 0,
-            faceRegions: roundedFaces,
-            movementDetected: false
-          }
-        })
-
-        // Handle violations
-        if (roundedFaces === 0) {
+      if (faceCount === 0) {
+        // Absent face: log (throttled) and escalate after a grace period
+        noFaceStreakRef.current += 1
+        awayStreakRef.current = 0
+        if (noFaceStreakRef.current >= NO_FACE_TICKS_FOR_WARNING) {
+          noFaceStreakRef.current = 0
+          triggerWarningRef.current?.("face_absent", "No face visible in camera for ~10 seconds")
+        } else {
           addViolation({
             type: "face_not_detected",
             timestamp: Date.now(),
             severity: "medium",
             description: "No person detected in camera feed"
           })
-        } else if (roundedFaces > 1) {
-          triggerWarning("multiple_faces", `${roundedFaces} people detected in camera`)
+        }
+      } else if (faceCount > 1) {
+        noFaceStreakRef.current = 0
+        awayStreakRef.current = 0
+        triggerWarningRef.current?.("multiple_faces", `${faceCount} people detected in camera`)
+      } else {
+        noFaceStreakRef.current = 0
+        // Single face: attention check via landmarks
+        try {
+          const landmarker = faceLandmarkerRef.current
+          if (landmarker) {
+            const lmRes = landmarker.detectForVideo(video, nowMs)
+            const pts = lmRes.faceLandmarks?.[0]
+            if (pts && isLookingAway(pts as { x: number; y: number }[])) {
+              awayStreakRef.current += 1
+              if (awayStreakRef.current >= AWAY_TICKS_FOR_FLAG) {
+                awayStreakRef.current = 0
+                addViolation({
+                  type: "looking_away",
+                  timestamp: Date.now(),
+                  severity: "medium",
+                  description: "Student looking away from screen for ~6 seconds (gaze/head pose)",
+                })
+              }
+            } else {
+              awayStreakRef.current = 0
+            }
+          }
+        } catch (lmErr) {
+          console.error("Landmark analysis error:", lmErr)
         }
       }
 
-      // Draw detection overlay
-      if (canvasRef.current && detections.length > 0) {
-        const displaySize = { width: video.videoWidth, height: video.videoHeight }
-        faceapi.matchDimensions(canvasRef.current, displaySize)
-        
-        const resizedDetections = faceapi.resizeResults(detections, displaySize)
-        const ctx = canvasRef.current.getContext("2d")
-        
-        if (ctx) {
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-          faceapi.draw.drawDetections(canvasRef.current, resizedDetections)
-        }
-      }
+      // Ambient audio sample on every tick
+      sampleAudio()
 
+      // Secondary-device sweep on its own cadence
+      if (nowMs - lastObjectCheckRef.current > OBJECT_CHECK_EVERY_MS) {
+        lastObjectCheckRef.current = nowMs
+        await checkForDevices(video)
+      }
     } catch (error) {
-      // Only log significant errors, not routine ones
       if (error instanceof Error && !error.message.includes("Failed to fetch")) {
-        console.error("Face detection error:", error.message)
+        console.error("Tracking error:", error.message)
       }
     }
-  }, [isCameraReady, isTrackingPaused])
+  }, [isCameraReady, isTrackingPaused, addViolation, isLookingAway, sampleAudio, checkForDevices])
 
-  const triggerWarning = useCallback((type: "multiple_faces" | "tab_switch", description: string) => {
+  const triggerWarning = useCallback((type: WarningType, description: string) => {
     setWarningCounts(prev => {
-      const newCounts = {
-        ...prev,
-        [type === "multiple_faces" ? "multipleFaces" : "tabSwitch"]: prev[type === "multiple_faces" ? "multipleFaces" : "tabSwitch"] + 1,
-        total: prev.total + 1
+      const key = type === "multiple_faces" ? "multipleFaces"
+        : type === "tab_switch" ? "tabSwitch"
+        : type === "face_absent" ? "faceAbsent" : "fullscreenExits"
+      const labels: Record<WarningType, string> = {
+        multiple_faces: "Multiple People Detected",
+        tab_switch: "Tab Switch Detected",
+        face_absent: "No Face Detected",
+        fullscreen_exit: "Fullscreen Exit",
       }
+      const newCounts = { ...prev, [key]: prev[key] + 1, total: prev.total + 1 }
 
       // Set current warning details
-      setCurrentWarning({
-        type: type === "multiple_faces" ? "Multiple People Detected" : "Tab Switch Detected",
-        message: description,
-        count: newCounts[type === "multiple_faces" ? "multipleFaces" : "tabSwitch"]
-      })
+      setCurrentWarning({ type: labels[type], message: description, count: newCounts[key] })
 
       // Show warning popup
       setShowWarningPopup(true)
 
-      // Check if suspension is needed
-      if (type === "multiple_faces" && newCounts.multipleFaces >= 3) {
-        setTimeout(() => {
-          setShowWarningPopup(false)
-          setShowSuspendPopup(true)
-        }, 100)
-        return newCounts
-      }
-
-      if (type === "tab_switch" && newCounts.tabSwitch >= 3) {
+      // Check if suspension is needed (3 strikes per signal)
+      if (newCounts[key] >= 3) {
         setTimeout(() => {
           setShowWarningPopup(false)
           setShowSuspendPopup(true)
@@ -491,15 +772,35 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
       }
 
       addViolation({
-        type: type === "multiple_faces" ? "multiple_faces" : "tab_switch",
+        type,
         timestamp: Date.now(),
         severity: "high",
-        description: `${description} (Warning ${newCounts[type === "multiple_faces" ? "multipleFaces" : "tabSwitch"]}/3)`
+        description: `${description} (Warning ${newCounts[key]}/3)`
       })
 
       return newCounts
     })
   }, [])
+
+  // Bind the late dispatcher once triggerWarning exists
+  triggerWarningRef.current = triggerWarning
+
+  // Fullscreen exits escalate: logged every time, warning popup every 3rd
+  const fullscreenExitCountRef = useRef(0)
+  const reportFullscreenExit = useCallback(() => {
+    fullscreenExitCountRef.current += 1
+    const n = fullscreenExitCountRef.current
+    if (n % 3 === 0) {
+      triggerWarning("fullscreen_exit", `Exited fullscreen mode ${n} times`)
+    } else {
+      addViolation({
+        type: "fullscreen_exit",
+        timestamp: Date.now(),
+        severity: "high",
+        description: `Student exited fullscreen mode (${n})`,
+      })
+    }
+  }, [addViolation, triggerWarning])
 
   const handleWarningOk = useCallback(() => {
     setShowWarningPopup(false)
@@ -514,7 +815,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
 
     try {
-      const response = await axios.post("https://schoozy.in/api/exam/suspend-exam", {}, {
+      const response = await axios.post(`${EXAM_API_BASE}/suspend-exam`, { email: studentEmail, exam_id: studentExamId }, {
         withCredentials: true
       })
       console.log("Exam suspended successfully:", response.data)
@@ -524,22 +825,13 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     }
 
     console.log("Exam suspended due to multiple violations")
-  }, [router])
+  }, [router, studentEmail, studentExamId])
 
   const handleSuspendConfirm = useCallback(() => {
     setShowSuspendPopup(false)
     suspendExam()
     exitFullScreen()
   }, [suspendExam])
-
-  const addViolation = useCallback((violation: CheatingViolation) => {
-    setViolations((prev) => [...prev, violation])
-    setCurrentViolation(violation)
-
-    setTimeout(() => {
-      setCurrentViolation(null)
-    }, 5000)
-  }, [])
 
   const enterFullScreen = useCallback(() => {
     const element = document.documentElement
@@ -589,9 +881,9 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
   // Start face detection when camera and models are ready
   useEffect(() => {
     if (isCameraReady && modelLoadedRef.current && !detectionIntervalRef.current && !isTrackingPaused) {
-      console.log("Starting face detection...")
+      console.log("Starting exam tracking...")
       setTimeout(() => {
-        detectionIntervalRef.current = setInterval(detectFaces, 2000)
+        detectionIntervalRef.current = setInterval(detectFrame, 2000)
       }, 2000)
     }
 
@@ -601,7 +893,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
       clearInterval(detectionIntervalRef.current)
       detectionIntervalRef.current = null
     }
-  }, [isCameraReady, detectFaces, isTrackingPaused])
+  }, [isCameraReady, detectFrame, isTrackingPaused])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -650,12 +942,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     setIsFullScreen(isCurrentlyFullScreen)
 
     if (!isCurrentlyFullScreen && examState.currentQuestion > 0 && !isTrackingPaused) {
-      addViolation({
-        type: "fullscreen_exit",
-        timestamp: Date.now(),
-        severity: "high",
-        description: "Student exited fullscreen mode",
-      })
+      reportFullscreenExit()
     }
   }, [addViolation, examState.currentQuestion, isTrackingPaused])
 
@@ -663,10 +950,12 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     setLoadingQuestion(true)
     setError(null)
     try {
-      const response = await axios.get("https://schoozy.in/api/exam/get-question", {
+      const response = await axios.get(`${EXAM_API_BASE}/get-question`, {
         withCredentials: true,
         params: {
           question_number: questionNumber,
+          email: studentEmail,
+          exam_id: studentExamId,
         },
       })
 
@@ -713,8 +1002,9 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
   const verifyCheck = async () => {
     try {
-      const response = await axios.get("https://schoozy.in/api/exam/verify-check", {
-        withCredentials: true
+      const response = await axios.get(`${EXAM_API_BASE}/verify-check`, {
+        withCredentials: true,
+        params: { email: studentEmail, exam_id: studentExamId },
       })
       if (response.data && response.data.success) {
         const user = response.data.user[0]
@@ -746,7 +1036,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
           return
         }
 
-        // 2. Load face-api models
+        // 2. Load vision models (MediaPipe face + landmarks, coco objects, audio)
         const modelsLoaded = await loadModels()
         if (!modelsLoaded) {
           setIsLoading(false)
@@ -755,7 +1045,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
 
         // 3. Verify models loaded
         if (!verifyModelsLoaded()) {
-          setError("Face detection models failed to load properly")
+          setError("Proctoring models failed to load properly")
           setIsLoading(false)
           return
         }
@@ -940,7 +1230,9 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     if (!currentApiQuestion || isExamSuspended) return
 
     try {
-      const response = await axios.post("https://schoozy.in/api/exam/submit-answer", {
+      const response = await axios.post(`${EXAM_API_BASE}/submit-answer`, {
+        email: studentEmail,
+        exam_id: studentExamId,
         question_number: examState.currentQuestion,
         question_id: currentApiQuestion.question_id,
         answer: selectedAnswer !== null ? optionIndexToLetter(selectedAnswer) : "",
@@ -1022,7 +1314,7 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
     setShowSubmitConfirm(false)
 
     try {
-      const response = await axios.post("https://schoozy.in/api/exam/complete-exam", {}, {
+      const response = await axios.post(`${EXAM_API_BASE}/complete-exam`, { email: studentEmail, exam_id: studentExamId }, {
         withCredentials: true
       })
 
@@ -1297,9 +1589,9 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
                     <span className={`px-2 py-1 rounded ${isTrackingPaused ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
                       {isTrackingPaused ? "⏸️ Paused" : "▶️ Monitoring"}
                     </span>
-                    {(warningCounts.multipleFaces > 0 || warningCounts.tabSwitch > 0) && (
+                    {(warningCounts.multipleFaces > 0 || warningCounts.tabSwitch > 0 || warningCounts.faceAbsent > 0 || warningCounts.fullscreenExits > 0) && (
                       <span className="px-2 py-1 rounded bg-red-100 text-red-800 text-xs">
-                        👥 {warningCounts.multipleFaces}/3 | 📱 {warningCounts.tabSwitch}/3
+                        👥 {warningCounts.multipleFaces}/3 | 📱 {warningCounts.tabSwitch}/3 | 🚫👤 {warningCounts.faceAbsent}/3 | 🖥️ {warningCounts.fullscreenExits}/3
                       </span>
                     )}
                   </div>
@@ -1607,8 +1899,6 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
         </div>
       </div>
 
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
       {showSubmitConfirm && !isExamSuspended && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -1633,6 +1923,8 @@ export function ExamInterface({ examState, config, onUpdateState }: ExamInterfac
                 <div className="text-xs text-yellow-700 mt-1">
                   <div>Multiple faces: {warningCounts.multipleFaces}/3</div>
                   <div>Tab switches: {warningCounts.tabSwitch}/3</div>
+                  <div>Face absent: {warningCounts.faceAbsent}/3</div>
+                  <div>Fullscreen exits: {warningCounts.fullscreenExits}/3</div>
                 </div>
               </div>
             )}

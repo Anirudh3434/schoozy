@@ -65,6 +65,7 @@ export default function ExamApp() {
             config={initialExamConfig}
             onStartExam={() => updateExamState({ currentPage: "exam" })}
             onBack={() => updateExamState({ currentPage: "student-info" })}
+            student={examState.student}
           />
         )
       case "exam":

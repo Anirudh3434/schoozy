@@ -6,15 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { ExamConfig } from "@/types/exam"
+import { EXAM_API_BASE } from "@/lib/exam-api"
 import axios from "axios"
 
 interface InstructionsPageProps {
   config: ExamConfig
   onStartExam: () => void
   onBack: () => void
+  student?: { email: string; examId: string } | null
 }
 
-export function InstructionsPage({ config, onStartExam, onBack }: InstructionsPageProps) {
+export function InstructionsPage({ config, onStartExam, onBack, student }: InstructionsPageProps) {
   const [currentStep, setCurrentStep] = useState<"general" | "mock">("general")
   const [timeRemaining, setTimeRemaining] = useState("03:00:00")
   const [selectedLanguage, setSelectedLanguage] = useState("english")
@@ -24,8 +26,8 @@ export function InstructionsPage({ config, onStartExam, onBack }: InstructionsPa
   const VerificationCheck = async () => {
     try {
       const response = await axios.post(
-        "https://schoozy.in/api/exam/verify-check",
-        {}, // request body (empty in your case)
+        `${EXAM_API_BASE}/verify-check`,
+        { email: student?.email ?? "", exam_id: student?.examId ?? "" },
         {
           withCredentials: true, // credentials should be in config, not body
         }
