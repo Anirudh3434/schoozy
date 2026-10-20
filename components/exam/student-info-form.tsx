@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { Student } from "@/types/exam"
+import { EXAM_API_BASE } from "@/lib/exam-api"
 import axios from "axios"
 
 interface StudentInfoFormProps {
@@ -83,9 +84,9 @@ export function StudentInfoForm({ onSubmit, onBack, onStatusChange }: StudentInf
     }
 
     try {
-      const response = await axios.post("https://schoozy.in/api/exam/verify-id", {
-        email: formData.email,
-        exam_id: formData.exam_id,
+      const response = await axios.post(`${EXAM_API_BASE}/verify-id`, {
+        email: formData.email.trim(),
+        exam_id: formData.exam_id.trim(),
       })
 
       if (response.status === 200) {
@@ -101,8 +102,8 @@ export function StudentInfoForm({ onSubmit, onBack, onStatusChange }: StudentInf
 
         const student: Student = {
           name: "Student",
-          email: formData.email,
-          examId: formData.exam_id,
+          email: formData.email.trim(),
+          examId: formData.exam_id.trim(),
           cameraStatus: cameraStatus,
         }
         onSubmit(student)
@@ -166,6 +167,7 @@ export function StudentInfoForm({ onSubmit, onBack, onStatusChange }: StudentInf
               <li>The clock will display the remaining time in the top right corner of the screen.</li>
               <li>Answering all questions is mandatory.</li>
               <li>Any suspicious activity will result in a warning.</li>
+              <li>Your camera and microphone are monitored for proctoring. Snapshots may be captured when violations are detected.</li>
               <li>Do not refresh the browser or navigate away from the exam page.</li>
               <li>Ensure stable internet connection throughout the exam.</li>
             </ul>
