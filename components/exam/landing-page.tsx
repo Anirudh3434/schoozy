@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ExamConfig } from "@/types/exam"
+import { EXAM_API_BASE } from "@/lib/exam-api"
 import axios from "axios"
 import { useEffect } from "react"
 
@@ -17,7 +18,7 @@ export function LandingPage({ config, onVerify, onNext, onStatusChange }: Landin
 
    const isVerified = async () => {
     
-    const response = await axios.get("https://schoozy.in/api/exam/verify-check", {
+    const response = await axios.get(`${EXAM_API_BASE}/verify-check`, {
       withCredentials: true,
     })
 
